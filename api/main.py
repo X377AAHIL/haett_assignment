@@ -25,7 +25,12 @@ from api.schemas import (
 )
 from src.predict import ChurnPredictor
 from src.explainability import ShapExplainer
+from src.monitoring.prediction_logger import PredictionLogger
+from src.monitoring.report_generator import ReportGenerator
+from src.monitoring.drift_monitor import DriftMonitor
 import pandas as pd
+import os
+import json
 
 # Logger setup
 logging.basicConfig(level=logging.INFO)
@@ -34,14 +39,16 @@ logger = logging.getLogger(__name__)
 # Global predictor and explainer instances
 predictor: Optional[ChurnPredictor] = None
 explainer: Optional[ShapExplainer] = None
+prediction_logger: Optional[PredictionLogger] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load the model on startup."""
-    global predictor, explainer
+    global predictor, explainer, prediction_logger
     try:
         predictor = ChurnPredictor()
+        prediction_logger = PredictionLogger()
         logger.info("✅ Model loaded successfully")
         
         # Initialize explainer for the API (no background data for Tree models)
@@ -149,6 +156,16 @@ async def predict_churn(request: PredictionRequest):
                 except Exception as e:
                     logger.error(f"Error computing explain_prediction in API: {e}")
 
+        # Log prediction to production dataset
+        if prediction_logger:
+            # Drop 'explain' flag since we only want features
+            log_features = {k: v for k, v in features.items() if k != "explain"}
+            prediction_logger.log(
+                features=log_features,
+                prediction_probability=result["churn_probability"],
+                prediction_class=result["risk_level"]
+            )
+
         return PredictionResponse(
             churn_probability=result["churn_probability"],
             risk_level=result["risk_level"],
@@ -162,6 +179,54 @@ async def predict_churn(request: PredictionRequest):
             status_code=500,
             detail=f"Prediction failed: {str(e)}",
         )
+
+
+@app.get("/monitor/status", tags=["Monitoring"])
+async def monitor_status():
+    """Return a summary of the current monitoring status."""
+    try:
+        generator = ReportGenerator()
+        ref_samples = 0
+        prod_samples = 0
+        
+        if os.path.exists(generator.reference_path):
+            ref_samples = len(pd.read_parquet(generator.reference_path))
+        if os.path.exists(generator.production_path):
+            prod_samples = len(pd.read_parquet(generator.production_path))
+            
+        history = []
+        if os.path.exists("artifacts/monitoring/drift_history.json"):
+            with open("artifacts/monitoring/drift_history.json", "r") as f:
+                history = json.load(f)
+                
+        latest_run = history[-1] if history else None
+        
+        return {
+            "reference_samples": ref_samples,
+            "production_samples": prod_samples,
+            "last_monitoring_run": latest_run["timestamp"] if latest_run else None,
+            "drift_detected": latest_run["drift_detected"] if latest_run else False,
+            "total_monitoring_runs": len(history)
+        }
+    except Exception as e:
+        logger.error(f"Monitoring status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/monitor/drift", tags=["Monitoring"])
+async def trigger_drift_report():
+    """Manually trigger drift monitoring and report generation."""
+    try:
+        generator = ReportGenerator()
+        monitor = DriftMonitor()
+        
+        result = generator.generate_reports()
+        monitor.log_metrics(result)
+        
+        return result
+    except Exception as e:
+        logger.error(f"Drift generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

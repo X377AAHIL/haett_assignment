@@ -1,0 +1,41 @@
+name: Scheduled Drift Monitoring
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run daily at midnight
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Download Datasets Artifact (Mock Example)
+        # In a real environment, you'd pull the latest parquets from S3/GCS or previous workflow artifacts.
+        # Here we assume the artifacts directory might be committed or mounted.
+        run: echo "Assuming artifacts are available locally."
+
+      - name: Run Drift Monitoring
+        run: |
+          python src/run_monitoring.py
+          
+      - name: Upload HTML Reports as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-reports
+          path: artifacts/monitoring/reports/html/
+          retention-days: 30

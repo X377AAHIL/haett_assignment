@@ -410,6 +410,34 @@ def train_pipeline():
     # Save comparison
     summary.to_csv(os.path.join(MODELS_DIR, "model_comparison.csv"))
 
+    # --- Monitoring Setup (Reference Dataset) ---
+    print("\n📦 Generating Monitoring Reference Dataset...")
+    import datetime
+    import yaml
+    
+    # Use validation data before scaling (test_features)
+    ref_df = test_features.copy()
+    y_prob = best_model.predict_proba(X_test)[:, 1] if hasattr(best_model, "predict_proba") else best_model.predict(X_test)
+    ref_df["prediction_probability"] = y_prob
+    ref_df["prediction"] = ["High" if p >= 0.6 else "Medium" if p >= 0.3 else "Low" for p in y_prob]
+    
+    model_version = datetime.datetime.now().strftime("v_%Y%m%d_%H%M%S")
+    ref_path = f"artifacts/monitoring/reference/reference_dataset_{model_version}.parquet"
+    os.makedirs(os.path.dirname(ref_path), exist_ok=True)
+    
+    ref_df.to_parquet(ref_path, engine="fastparquet")
+    print(f"  Reference dataset saved to {ref_path}")
+    
+    # Update config
+    config_path = "config/monitoring.yaml"
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            mon_config = yaml.safe_load(f)
+        mon_config["reference_dataset_path"] = ref_path
+        with open(config_path, "w") as f:
+            yaml.dump(mon_config, f)
+        print("  Updated config/monitoring.yaml with new reference dataset path.")
+
     print(f"\n✅ Training complete. Best model: {best_name}")
     print(f"   MLflow tracking URI: file://{MLFLOW_TRACKING_URI}")
     print(f"   Run: mlflow ui --backend-store-uri file://{MLFLOW_TRACKING_URI} --port 5001")

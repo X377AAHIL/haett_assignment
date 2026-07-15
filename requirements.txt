@@ -28,7 +28,12 @@ httpx==0.28.1
 joblib==1.4.2
 python-dotenv==1.0.1
 
-# CI/CD & Linting
-black==24.4.2
-ruff==0.4.8
-pytest-cov==5.0.0
+# CI/CD and Quality
+black>=23.9.1
+ruff>=0.0.292
+pytest-cov>=4.1.0
+
+# Monitoring (Evidently AI)
+evidently>=0.4.17
+pyyaml>=6.0.1
+fastparquet>=2023.10.1

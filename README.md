@@ -96,6 +96,36 @@ SHAP is the state-of-the-art framework for interpreting machine learning models.
 
 ---
 
+## 📈 Data Drift Monitoring (Evidently AI)
+
+Why monitor? In production, models degrade silently because user behavior changes (Data Drift) or the relationship between features and the target changes (Concept Drift). Because ground truth labels (churn) aren't immediately available, we monitor **Prediction Probability Drift** to detect when the model starts acting differently.
+
+This project natively integrates **Evidently AI** with a robust, production-grade architecture:
+
+```mermaid
+graph TD
+    Training[Training Pipeline] --> Ref[Reference Dataset versioned]
+    Ref --> Model[Registered Model]
+    Model --> API[FastAPI]
+    API --> Logger[PredictionLogger]
+    API --> SHAP[SHAP Explainer]
+    SHAP --> Resp[Prediction Response]
+    Logger --> Prod[Production Dataset]
+    Prod --> Drift[Drift Monitor]
+    Drift --> Ev[Evidently Reports]
+    Ev --> MLflow[MLflow]
+    Ev --> HTML[HTML / JSON]
+    MLflow -.-> Cron[GitHub Actions Scheduled]
+```
+
+### How to use it:
+- Every prediction via `/predict` is asynchronously appended to a local parquet dataset using the `PredictionLogger`.
+- A GitHub Action runs daily (or manually via `src/run_monitoring.py`) to compare the **Reference Dataset** (saved during training) with the **Production Dataset**.
+- Rich HTML dashboards and JSON metrics are generated and uploaded directly to **MLflow** under the `monitoring/` hierarchy.
+- You can fetch live metrics via `GET /monitor/status` or manually trigger reports via `POST /monitor/drift`.
+
+---
+
 ## 🔍 API Usage Example
 
 You can query the `/predict` endpoint to get the churn probability, risk level, and a dynamic business recommendation.

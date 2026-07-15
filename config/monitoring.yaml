@@ -1,0 +1,42 @@
+# Evidently AI Monitoring Configuration
+
+monitoring_interval: "daily"
+
+# Reference dataset created dynamically after model training
+reference_dataset_path: "artifacts/monitoring/reference/reference_dataset.parquet"
+production_dataset_path: "artifacts/monitoring/production/production_predictions.parquet"
+
+# Thresholds
+minimum_samples_before_monitoring: 10
+report_retention_days: 30
+
+# Output directories
+output_directory: "artifacts/monitoring"
+
+report_format:
+  - "html"
+  - "json"
+
+columns:
+  target_column: "churned"
+  prediction_column: "prediction_probability"
+  prediction_class_column: "prediction"
+  numerical_features:
+    - "days_since_last_order"
+    - "orders_last_30_days"
+    - "avg_order_value"
+    - "subscription_duration_days"
+    - "coupon_usage_rate"
+    - "meal_swap_frequency"
+    - "order_consistency"
+    - "order_trend_slope"
+    - "avg_rating"
+    - "rating_trend"
+    - "engagement_score"
+    - "engagement_decline"
+    - "support_ticket_count"
+    - "total_lifetime_orders"
+    - "avg_items_per_order"
+    - "days_to_subscription_expiry"
+  categorical_features:
+    - "is_premium"
