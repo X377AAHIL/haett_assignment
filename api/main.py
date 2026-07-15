@@ -24,25 +24,38 @@ from api.schemas import (
     RecommendationResponse,
 )
 from src.predict import ChurnPredictor
+from src.explainability import ShapExplainer
+import pandas as pd
 
 # Logger setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global predictor instance
+# Global predictor and explainer instances
 predictor: Optional[ChurnPredictor] = None
+explainer: Optional[ShapExplainer] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load the model on startup."""
-    global predictor
+    global predictor, explainer
     try:
         predictor = ChurnPredictor()
         logger.info("✅ Model loaded successfully")
+        
+        # Initialize explainer for the API (no background data for Tree models)
+        try:
+            explainer = ShapExplainer(model=predictor.model)
+            logger.info("✅ ShapExplainer initialized successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ ShapExplainer initialization failed: {e}")
+            explainer = None
+            
     except FileNotFoundError as e:
         logger.warning(f"⚠️ Model not found: {e}. Train the model first.")
         predictor = None
+        explainer = None
     yield
     logger.info("Shutting down...")
 
@@ -117,10 +130,30 @@ async def predict_churn(request: PredictionRequest):
                 reason=result["recommendation"]["reason"],
             )
 
+        top_factors = None
+        if request.explain:
+            if explainer is None:
+                logger.warning("Explanation requested but explainer is not initialized.")
+            else:
+                try:
+                    # Prepare and scale features identically to predict()
+                    df = pd.DataFrame([features])
+                    for col in predictor.feature_columns:
+                        if col not in df.columns:
+                            df[col] = 0
+                    df = df[predictor.feature_columns]
+                    X_scaled = predictor.transformer.scaler.transform(df)
+                    X_scaled_df = pd.DataFrame(X_scaled, columns=predictor.feature_columns)
+                    
+                    top_factors = explainer.explain_prediction(X_scaled_df, top_k=5)
+                except Exception as e:
+                    logger.error(f"Error computing explain_prediction in API: {e}")
+
         return PredictionResponse(
             churn_probability=result["churn_probability"],
             risk_level=result["risk_level"],
             recommendation=recommendation,
+            top_factors=top_factors,
         )
 
     except Exception as e:

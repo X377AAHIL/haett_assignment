@@ -83,6 +83,19 @@ The workflow will fail immediately if any of these steps error out, ensuring tha
 
 ---
 
+## 🧠 Model Explainability (SHAP)
+
+To build trust and provide transparency, this project natively integrates **SHAP (SHapley Additive exPlanations)**. 
+
+SHAP is the state-of-the-art framework for interpreting machine learning models. It decomposes the model's prediction into additive feature impacts, telling us *exactly* how much each feature contributed to the final churn probability and in which direction (increasing or decreasing risk).
+
+### How it Works:
+1. **Model Agnostic Detection**: The system automatically detects the model type during training and initializes the most efficient explainer (e.g., `TreeExplainer` for XGBoost).
+2. **MLflow Integration**: When `src/model_training.py` finishes, it automatically generates global explanations (Summary Plot, Bar Plot) and local explanations (Waterfall plot for the highest risk user). These plots, along with a `feature_importance.json` file, are logged directly into MLflow under the `explainability/` artifact path.
+3. **Real-time API Explanations**: The `ShapExplainer` is cached in memory when the FastAPI server starts. You can request real-time explanations by passing `"explain": true` to the `/predict` endpoint. It returns human-readable feature impacts without significantly degrading API response times.
+
+---
+
 ## 🔍 API Usage Example
 
 You can query the `/predict` endpoint to get the churn probability, risk level, and a dynamic business recommendation.

@@ -46,6 +46,7 @@ from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
 from src.data_preparation import prepare_dataset
+from src.explainability import ShapExplainer
 from src.feature_engineering import (
     FEATURE_COLUMNS,
     FeatureTransformer,
@@ -359,6 +360,42 @@ def train_pipeline():
             )
         mlflow.log_artifact(model_path)
         mlflow.log_artifact(metadata_path)
+
+        # --- SHAP Explainability Integration ---
+        print("\n🧠 Generating SHAP Explanations...")
+        X_train_df = pd.DataFrame(X_train, columns=FEATURE_COLUMNS)
+        X_test_df = pd.DataFrame(X_test, columns=FEATURE_COLUMNS)
+        
+        # Initialize Explainer with dynamically selected best model
+        explainer = ShapExplainer(model=best_model, background_data=X_train_df)
+        shap_values = explainer.get_shap_values(X_test_df)
+        
+        # Define paths
+        shap_dir = os.path.join("artifacts", "shap")
+        os.makedirs(shap_dir, exist_ok=True)
+        
+        summary_path = os.path.join(shap_dir, "summary.png")
+        bar_path = os.path.join(shap_dir, "bar.png")
+        waterfall_path = os.path.join(shap_dir, "waterfall.png")
+        json_path = os.path.join(shap_dir, "feature_importance.json")
+        
+        # Save artifacts locally
+        explainer.save_summary_plot(shap_values, summary_path)
+        explainer.save_bar_plot(shap_values, bar_path)
+        
+        # Find sample with highest predicted churn probability for waterfall plot
+        y_prob = best_model.predict_proba(X_test)[:, 1] if hasattr(best_model, "predict_proba") else best_model.predict(X_test)
+        highest_churn_idx = np.argmax(y_prob)
+        explainer.save_waterfall_plot(shap_values, highest_churn_idx, waterfall_path)
+        
+        explainer.save_feature_importance_json(shap_values, json_path)
+        
+        # Log to MLflow under 'explainability' directory
+        mlflow.log_artifact(summary_path, artifact_path="explainability")
+        mlflow.log_artifact(bar_path, artifact_path="explainability")
+        mlflow.log_artifact(waterfall_path, artifact_path="explainability")
+        mlflow.log_artifact(json_path, artifact_path="explainability")
+        print("  SHAP artifacts successfully logged to MLflow.")
 
     # --- Results Summary ---
     print("\n" + "=" * 60)

@@ -126,3 +126,24 @@ class TestPredictEndpoint:
         """Empty request body should return 422."""
         response = client.post("/predict", json={})
         assert response.status_code == 422
+
+    def test_explain_false_omits_top_factors(self):
+        response = client.post("/predict", json=VALID_REQUEST)
+        if response.status_code == 200:
+            data = response.json()
+            assert data.get("top_factors") is None
+
+    def test_explain_true_includes_top_factors(self):
+        valid_explain = VALID_REQUEST.copy()
+        valid_explain["explain"] = True
+        response = client.post("/predict", json=valid_explain)
+        if response.status_code == 200:
+            data = response.json()
+            assert "top_factors" in data
+            assert isinstance(data["top_factors"], list)
+            if len(data["top_factors"]) > 0:
+                factor = data["top_factors"][0]
+                assert "feature" in factor
+                assert "impact" in factor
+                assert "direction" in factor
+                assert "description" in factor

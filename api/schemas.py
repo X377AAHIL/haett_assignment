@@ -14,6 +14,11 @@ class PredictionRequest(BaseModel):
     Represents a user's historical activity features.
     All fields are required with sensible defaults and validation.
     """
+    
+    explain: bool = Field(
+        False, 
+        description="Whether to include SHAP explanations in the response"
+    )
 
     days_since_last_order: float = Field(
         ...,
@@ -96,17 +101,17 @@ class PredictionRequest(BaseModel):
         default=0.0,
         ge=-1.0,
         le=1.0,
-        description="Fractional decline in engagement (positive = declining)",
+        ...,
+        description="Recent drop in engagement compared to historical average",
         examples=[0.2],
     )
-    support_ticket_count: float = Field(
+    support_ticket_count: int = Field(
         ...,
         ge=0,
-        le=500,
-        description="Total number of support tickets raised",
+        description="Number of support tickets raised by the user",
         examples=[1],
     )
-    total_lifetime_orders: float = Field(
+    total_lifetime_orders: int = Field(
         ...,
         ge=0,
         le=5000,
@@ -139,6 +144,7 @@ class PredictionRequest(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "explain": True,
                     "days_since_last_order": 15,
                     "orders_last_30_days": 2,
                     "avg_order_value": 450.0,
@@ -168,6 +174,14 @@ class RecommendationResponse(BaseModel):
     reason: str = Field(..., description="Why this recommendation is appropriate")
 
 
+class TopFactor(BaseModel):
+    """Explains a single feature's impact on the prediction."""
+    feature: str = Field(..., description="The name of the feature")
+    impact: float = Field(..., description="The magnitude of the SHAP impact")
+    direction: str = Field(..., description="Whether the impact increases or decreases risk (increase_risk, decrease_risk)")
+    description: str = Field(..., description="Human-readable description of the feature")
+
+
 class PredictionResponse(BaseModel):
     """Response from the /predict endpoint."""
     churn_probability: float = Field(
@@ -185,6 +199,10 @@ class PredictionResponse(BaseModel):
     recommendation: Optional[RecommendationResponse] = Field(
         None,
         description="Business recommendation for Medium/High risk users",
+    )
+    top_factors: Optional[List[TopFactor]] = Field(
+        None,
+        description="Top factors influencing the prediction (if explain=True)",
     )
 
 
