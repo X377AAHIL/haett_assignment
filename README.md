@@ -66,6 +66,23 @@ If you prefer to run it locally without Docker:
 
 ---
 
+## 🤖 Continuous Integration (GitHub Actions)
+
+This project uses **GitHub Actions** to enforce a professional standard for code quality and correctness. 
+
+The CI workflow configuration is located at `.github/workflows/ci.yml`.
+
+Whenever code is **pushed to the `main` branch** or a **Pull Request is opened**, the pipeline automatically runs the following steps in parallel across Python 3.10 and 3.11:
+1. **Dependency Installation & Caching:** Installs all required packages and caches pip dependencies and Docker layers for lightning-fast execution.
+2. **Code Formatting (`Black`):** Enforces PEP8 compliant code style formatting.
+3. **Linting (`Ruff`):** Performs ultra-fast linting to catch syntax errors and maintain code quality.
+4. **Unit Testing (`pytest`):** Runs the full 31-test test suite and uploads the `pytest.xml` results as an artifact.
+5. **Docker Build Verification:** Attempts to build the `Dockerfile` using Docker Buildx to guarantee that the production image will always successfully compile without errors.
+
+The workflow will fail immediately if any of these steps error out, ensuring that the `main` branch always remains production-ready. 
+
+---
+
 ## 🔍 API Usage Example
 
 You can query the `/predict` endpoint to get the churn probability, risk level, and a dynamic business recommendation.
