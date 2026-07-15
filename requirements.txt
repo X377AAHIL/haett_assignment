@@ -37,3 +37,6 @@ pytest-cov>=4.1.0
 evidently>=0.4.17
 pyyaml>=6.0.1
 fastparquet>=2023.10.1
+
+# Observability
+python-json-logger>=2.0.7

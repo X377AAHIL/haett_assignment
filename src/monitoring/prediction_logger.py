@@ -2,9 +2,9 @@ import os
 import uuid
 import datetime
 import pandas as pd
-import logging
+from src.observability.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("monitoring.prediction_logger")
 
 
 class PredictionLogger:

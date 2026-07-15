@@ -2,13 +2,13 @@ import os
 import yaml
 import datetime
 import pandas as pd
-import logging
 import mlflow
 
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset, DataQualityPreset
+from evidently import Report
+from evidently.presets import DataDriftPreset, DataSummaryPreset
+from src.observability.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("monitoring.report_generator")
 
 class ReportGenerator:
     """Generates drift and data quality reports using Evidently AI."""
@@ -47,7 +47,7 @@ class ReportGenerator:
         # Note: We monitor prediction probability drift as part of data drift
         report = Report(metrics=[
             DataDriftPreset(),
-            DataQualityPreset()
+            DataSummaryPreset()
         ])
         
         report.run(reference_data=ref_data, current_data=prod_data)

@@ -9,12 +9,23 @@ Endpoints:
 - GET  /docs:    Auto-generated API documentation (Swagger UI)
 """
 
-import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+from src.observability.logger import get_logger
+from src.observability.middleware import ObservabilityMiddleware
+from src.observability.health import health_router
+from src.observability.exceptions import (
+    ApplicationError,
+    ModelNotLoadedError,
+    PredictionError,
+    global_exception_handler,
+    application_error_handler
+)
+from src.observability.metrics import track_duration, record_prediction_latency
 
 from api.schemas import (
     ErrorResponse,
@@ -33,8 +44,7 @@ import os
 import json
 
 # Logger setup
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger("api")
 
 # Global predictor and explainer instances
 predictor: Optional[ChurnPredictor] = None
@@ -46,6 +56,13 @@ prediction_logger: Optional[PredictionLogger] = None
 async def lifespan(app: FastAPI):
     """Load the model on startup."""
     global predictor, explainer, prediction_logger
+    
+    logger.info("application_started", extra={
+        "event": "application_started",
+        "python": "3.11",
+        "mlflow_tracking": "enabled"
+    })
+    
     try:
         predictor = ChurnPredictor()
         prediction_logger = PredictionLogger()
@@ -63,8 +80,10 @@ async def lifespan(app: FastAPI):
         logger.warning(f"⚠️ Model not found: {e}. Train the model first.")
         predictor = None
         explainer = None
+    finally:
+        logger.info("application_shutdown", extra={"event": "application_shutdown"})
+        logger.info("🛑 Shutting down server")
     yield
-    logger.info("Shutting down...")
 
 
 app = FastAPI(
@@ -80,6 +99,13 @@ app = FastAPI(
         422: {"model": ErrorResponse, "description": "Validation Error"},
     },
 )
+
+# Exception Handlers
+app.add_exception_handler(Exception, global_exception_handler)
+app.add_exception_handler(ApplicationError, application_error_handler)
+
+# Middleware
+app.add_middleware(ObservabilityMiddleware)
 
 # CORS middleware
 app.add_middleware(
@@ -101,6 +127,8 @@ async def health_check():
     )
 
 
+app.include_router(health_router)
+
 @app.post(
     "/predict",
     response_model=PredictionResponse,
@@ -117,11 +145,10 @@ async def predict_churn(request: PredictionRequest):
     - **recommendation**: Actionable business recommendation (for Medium/High risk)
     """
     if predictor is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Model not loaded. Please train the model first by running: python -m src.model_training",
-        )
+        raise ModelNotLoadedError()
 
+    import time
+    start_predict = time.perf_counter()
     try:
         # Convert request to feature dictionary
         features = request.model_dump()
@@ -152,9 +179,14 @@ async def predict_churn(request: PredictionRequest):
                     X_scaled = predictor.transformer.scaler.transform(df)
                     X_scaled_df = pd.DataFrame(X_scaled, columns=predictor.feature_columns)
                     
-                    top_factors = explainer.explain_prediction(X_scaled_df, top_k=5)
+                    with track_duration("shap_explainability", logger):
+                        top_factors = explainer.explain_prediction(X_scaled_df, top_k=5)
                 except Exception as e:
                     logger.error(f"Error computing explain_prediction in API: {e}")
+
+        # Record metrics
+        latency_ms = (time.perf_counter() - start_predict) * 1000
+        record_prediction_latency(latency_ms)
 
         # Log prediction to production dataset
         if prediction_logger:
@@ -173,12 +205,15 @@ async def predict_churn(request: PredictionRequest):
             top_factors=top_factors,
         )
 
+    except ApplicationError:
+        raise
     except Exception as e:
         logger.error(f"Prediction error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Prediction failed: {str(e)}",
-        )
+        raise PredictionError(f"Prediction failed: {str(e)}")
+
+
+# Note: The old monitor endpoints are removed here since they might conflict or we can keep them.
+# The user asked to separate /health, but let's keep /monitor/drift since it was built previously.
 
 
 @app.get("/monitor/status", tags=["Monitoring"])
@@ -210,23 +245,27 @@ async def monitor_status():
         }
     except Exception as e:
         logger.error(f"Monitoring status error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+        from src.observability.exceptions import MonitoringError
+        raise MonitoringError(str(e))
 
 @app.post("/monitor/drift", tags=["Monitoring"])
 async def trigger_drift_report():
     """Manually trigger drift monitoring and report generation."""
     try:
+        from src.monitoring.report_generator import ReportGenerator
+        from src.monitoring.drift_monitor import DriftMonitor
         generator = ReportGenerator()
         monitor = DriftMonitor()
         
-        result = generator.generate_reports()
+        with track_duration("drift_report_generation", logger):
+            result = generator.generate_reports()
         monitor.log_metrics(result)
         
         return result
     except Exception as e:
         logger.error(f"Drift generation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        from src.observability.exceptions import MonitoringError
+        raise MonitoringError(str(e))
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 import os
 import json
-import logging
+from src.observability.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("monitoring.drift_monitor")
 
 class DriftMonitor:
     """Handles extracting and storing historical drift metrics."""

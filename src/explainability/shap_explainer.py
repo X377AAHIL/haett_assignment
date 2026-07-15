@@ -8,7 +8,7 @@ and extract top factors for API consumption.
 
 import os
 import json
-import logging
+from src.observability.logger import get_logger
 from typing import Any, Dict, List, Tuple
 
 import matplotlib
@@ -19,13 +19,7 @@ import pandas as pd
 import shap
 
 # Configure logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+logger = get_logger("explainability.shap")
 
 # Feature descriptions for API
 FEATURE_DESCRIPTIONS = {

@@ -126,6 +126,45 @@ graph TD
 
 ---
 
+## 🔬 Observability & Tracing
+
+This project features a production-grade observability layer ensuring end-to-end traceability across all subsystems.
+
+```mermaid
+graph TD
+    Client[Client Request] --> MW[Middleware]
+    MW --> |Injects request_id / correlation_id| Pred[Prediction]
+    Pred --> LogAdapter[Logging Adapter]
+    Pred --> SHAP[SHAP]
+    Pred --> Monitor[Monitoring]
+    SHAP --> LogAdapter
+    Monitor --> LogAdapter
+    LogAdapter --> JSON[JSON Logs]
+    Pred --> Resp[Response]
+```
+
+### Key Features
+1. **Request Tracing**: A FastAPI middleware generates a unique `request_id` and `correlation_id` for every incoming request. Using Python's `contextvars`, these IDs are propagated seamlessly across all components (Feature Engineering, Prediction, Explainability, Monitoring) and automatically injected into every log entry via a custom `LoggerAdapter`.
+2. **Structured JSON Logging**: Powered by `python-json-logger`, all logs are emitted as structured JSON, making them immediately compatible with tools like Datadog, ELK, or CloudWatch.
+3. **Strict Logging Policy**:
+   - `INFO`: Application startup/shutdown, prediction success, monitoring runs.
+   - `WARNING`: Missing expected features, low sample counts.
+   - `ERROR`: Prediction or subsystem failures.
+   - `DEBUG`: Internal timings, feature engineering details.
+   - **No Sensitive Data**: Raw user vectors and PII are strictly omitted from logs.
+4. **Log Rotation**: Automated rotating file handlers (`api.log`, `training.log`, `prediction.log`, `monitoring.log`) prevent unlimited disk growth.
+5. **In-Memory Metrics**: Latency and usage metrics are tracked live and exposed via `GET /metrics`.
+6. **Graceful Exception Handling**: A unified `ApplicationError` hierarchy intercepts failures globally, returning sanitized JSON responses without leaking stack traces.
+
+### Endpoints
+- `GET /health`: Lightweight liveness probe.
+- `GET /ready`: Deep readiness probe checking model loading, SHAP init, reference datasets, and config availability.
+- `GET /version`: Application and model metadata (including `git_commit`).
+- `GET /metrics`: In-memory runtime metrics (e.g., `prediction_count`, `average_latency`).
+- `GET /system/info`: Global ecosystem summary (MLflow/SHAP/Monitoring status).
+
+---
+
 ## 🔍 API Usage Example
 
 You can query the `/predict` endpoint to get the churn probability, risk level, and a dynamic business recommendation.

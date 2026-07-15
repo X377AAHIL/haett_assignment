@@ -1,0 +1,15 @@
+# Observability Layer Configuration
+
+application_version: "1.0.0"
+model_version: "v1.2"
+service_name: "haett_churn_api"
+
+logging:
+  log_level: "INFO"
+  log_directory: "logs"
+  rotation_size_mb: 10
+  backup_count: 5
+  retention_days: 30
+  enable_json_logs: true
+  enable_request_logging: true
+  enable_latency_metrics: true

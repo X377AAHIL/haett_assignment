@@ -5,7 +5,7 @@ Defines request and response models with validation.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 
 
 class PredictionRequest(BaseModel):
@@ -101,7 +101,6 @@ class PredictionRequest(BaseModel):
         default=0.0,
         ge=-1.0,
         le=1.0,
-        ...,
         description="Recent drop in engagement compared to historical average",
         examples=[0.2],
     )

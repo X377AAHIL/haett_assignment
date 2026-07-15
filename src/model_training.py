@@ -53,7 +53,11 @@ from src.feature_engineering import (
     build_features,
 )
 
+from src.observability.logger import get_logger
+
 warnings.filterwarnings("ignore")
+
+logger = get_logger("training")
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -206,12 +210,10 @@ def hyperparameter_tuning(X_train: np.ndarray, y_train: np.ndarray) -> XGBClassi
 
 def train_pipeline():
     """Full training pipeline with MLflow tracking."""
-    print("=" * 60)
-    print("Haett Model Training Pipeline")
-    print("=" * 60)
+    logger.info("Starting Haett Model Training Pipeline")
 
     # --- Data Preparation ---
-    print("\n📊 Phase 1: Data Preparation")
+    logger.info("Phase 1: Data Preparation")
     train_users, test_users, merged = prepare_dataset()
 
     # --- Feature Engineering ---
