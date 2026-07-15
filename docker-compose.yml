@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  # Churn Prediction API
+  api:
+    build: .
+    container_name: haett-churn-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mlruns:/app/mlruns
+      - ./models:/app/models
+    environment:
+      - PYTHONPATH=/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MLflow Tracking Server
+  mlflow:
+    image: python:3.11-slim
+    container_name: haett-mlflow
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./mlruns:/mlruns
+    working_dir: /
+    command: >
+      bash -c "pip install mlflow --quiet &&
+               mlflow ui --backend-store-uri file:///mlruns --host 0.0.0.0 --port 5001"
+    restart: unless-stopped

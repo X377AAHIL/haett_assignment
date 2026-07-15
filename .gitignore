@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Data (generated, can be reproduced)
+data/raw/
+data/processed/
+
+# Models (generated, can be reproduced)
+models/*.joblib
+models/*.png
+models/*.csv
+models/*.json
+
+# MLflow
+mlruns/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Extracted pages file
+_extracted/
