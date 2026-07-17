@@ -1,8 +1,10 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+
 class ApplicationError(Exception):
     """Base exception for all custom application errors."""
+
     def __init__(self, message: str, status_code: int = 500):
         super().__init__(message)
         self.message = message
@@ -43,6 +45,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     """Handles all generic unhandled exceptions gracefully."""
     # Note: we import the logger locally to avoid circular imports during setup
     from src.observability.logger import get_logger
+
     logger = get_logger("exception_handler")
     logger.error(f"Unhandled server error: {exc}", exc_info=True)
     return JSONResponse(
@@ -54,6 +57,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def application_error_handler(request: Request, exc: ApplicationError):
     """Handles our domain-specific ApplicationError hierarchy."""
     from src.observability.logger import get_logger
+
     logger = get_logger("exception_handler")
     logger.error(f"Application error: {exc.message}")
     return JSONResponse(

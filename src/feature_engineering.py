@@ -94,7 +94,9 @@ def compute_order_features(user_ids: pd.Series, orders: pd.DataFrame) -> pd.Data
         .reset_index(name="orders_last_30_days")
     )
     order_features = order_features.merge(orders_last_30, on="user_id", how="left")
-    order_features["orders_last_30_days"] = order_features["orders_last_30_days"].fillna(0)
+    order_features["orders_last_30_days"] = order_features[
+        "orders_last_30_days"
+    ].fillna(0)
 
     # Order consistency (std of inter-order gaps in days)
     def calc_consistency(group):
@@ -136,7 +138,9 @@ def compute_order_features(user_ids: pd.Series, orders: pd.DataFrame) -> pd.Data
         recent_avg = sorted_group.iloc[mid:]["rating"].mean()
         return recent_avg - early_avg
 
-    rating_trends = user_orders.groupby("user_id").apply(calc_rating_trend).reset_index()
+    rating_trends = (
+        user_orders.groupby("user_id").apply(calc_rating_trend).reset_index()
+    )
     rating_trends.columns = ["user_id", "rating_trend"]
     order_features = order_features.merge(rating_trends, on="user_id", how="left")
 
@@ -146,7 +150,9 @@ def compute_order_features(user_ids: pd.Series, orders: pd.DataFrame) -> pd.Data
     return order_features
 
 
-def compute_engagement_features(user_ids: pd.Series, engagement: pd.DataFrame) -> pd.DataFrame:
+def compute_engagement_features(
+    user_ids: pd.Series, engagement: pd.DataFrame
+) -> pd.DataFrame:
     """Compute engagement-related features per user."""
     user_eng = engagement[engagement["user_id"].isin(user_ids)].copy()
 
@@ -156,7 +162,9 @@ def compute_engagement_features(user_ids: pd.Series, engagement: pd.DataFrame) -
 
     # Engagement score: composite
     user_eng["daily_engagement"] = (
-        user_eng["app_opens"] + user_eng["recipes_viewed"] + user_eng["notification_clicks"]
+        user_eng["app_opens"]
+        + user_eng["recipes_viewed"]
+        + user_eng["notification_clicks"]
     )
 
     eng_score = user_eng.groupby("user_id")["daily_engagement"].mean().reset_index()
@@ -184,7 +192,8 @@ def compute_engagement_features(user_ids: pd.Series, engagement: pd.DataFrame) -
     decline = recent_eng.merge(prior_eng, on="user_id", how="left")
     decline["engagement_decline"] = np.where(
         decline["prior_engagement"] > 0,
-        (decline["prior_engagement"] - decline["recent_engagement"]) / decline["prior_engagement"],
+        (decline["prior_engagement"] - decline["recent_engagement"])
+        / decline["prior_engagement"],
         0,
     )
     decline = decline[["user_id", "engagement_decline"]]
@@ -196,36 +205,55 @@ def compute_engagement_features(user_ids: pd.Series, engagement: pd.DataFrame) -
     return eng_features
 
 
-def compute_subscription_features(user_ids: pd.Series, users: pd.DataFrame,
-                                   subscriptions: pd.DataFrame) -> pd.DataFrame:
+def compute_subscription_features(
+    user_ids: pd.Series, users: pd.DataFrame, subscriptions: pd.DataFrame
+) -> pd.DataFrame:
     """Compute subscription-related features."""
     # Subscription duration
-    sub_features = users[users["user_id"].isin(user_ids)][["user_id", "signup_date", "subscription_plan"]].copy()
+    sub_features = users[users["user_id"].isin(user_ids)][
+        ["user_id", "signup_date", "subscription_plan"]
+    ].copy()
 
     sub_features["subscription_duration_days"] = (
         OBSERVATION_DATE - sub_features["signup_date"]
     ).dt.days
 
     # Is premium
-    sub_features["is_premium"] = sub_features["subscription_plan"].isin(["Premium", "Family"]).astype(int)
+    sub_features["is_premium"] = (
+        sub_features["subscription_plan"].isin(["Premium", "Family"]).astype(int)
+    )
 
     # Days to subscription expiry
-    subs_filtered = subscriptions[subscriptions["user_id"].isin(user_ids)][["user_id", "plan_end"]].copy()
+    subs_filtered = subscriptions[subscriptions["user_id"].isin(user_ids)][
+        ["user_id", "plan_end"]
+    ].copy()
     sub_features = sub_features.merge(subs_filtered, on="user_id", how="left")
     sub_features["days_to_subscription_expiry"] = (
         sub_features["plan_end"] - OBSERVATION_DATE
     ).dt.days
     # Negative means already expired
-    sub_features["days_to_subscription_expiry"] = sub_features["days_to_subscription_expiry"].fillna(-30)
+    sub_features["days_to_subscription_expiry"] = sub_features[
+        "days_to_subscription_expiry"
+    ].fillna(-30)
 
-    sub_features = sub_features[["user_id", "subscription_duration_days", "is_premium",
-                                  "days_to_subscription_expiry"]]
+    sub_features = sub_features[
+        [
+            "user_id",
+            "subscription_duration_days",
+            "is_premium",
+            "days_to_subscription_expiry",
+        ]
+    ]
 
     return sub_features
 
 
-def build_features(users_df: pd.DataFrame, orders: pd.DataFrame,
-                   subscriptions: pd.DataFrame, engagement: pd.DataFrame) -> pd.DataFrame:
+def build_features(
+    users_df: pd.DataFrame,
+    orders: pd.DataFrame,
+    subscriptions: pd.DataFrame,
+    engagement: pd.DataFrame,
+) -> pd.DataFrame:
     """Build the complete feature matrix for a set of users.
 
     Args:
@@ -267,7 +295,9 @@ def build_features(users_df: pd.DataFrame, orders: pd.DataFrame,
     features["engagement_decline"] = features["engagement_decline"].fillna(0)
     features["support_ticket_count"] = features["support_ticket_count"].fillna(0)
 
-    print(f"  Feature matrix: {features.shape[0]} users × {len(FEATURE_COLUMNS)} features")
+    print(
+        f"  Feature matrix: {features.shape[0]} users × {len(FEATURE_COLUMNS)} features"
+    )
     return features
 
 

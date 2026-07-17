@@ -19,29 +19,33 @@ from src.feature_engineering import (
 @pytest.fixture
 def sample_orders():
     """Create sample order data for testing."""
-    return pd.DataFrame({
-        "order_id": [f"ORD{i}" for i in range(10)],
-        "user_id": ["U001"] * 5 + ["U002"] * 5,
-        "order_date": pd.date_range("2025-04-01", periods=5).tolist() * 2,
-        "order_value": [100, 150, 120, 200, 180, 90, 80, 70, 60, 50],
-        "items_count": [2, 3, 2, 4, 3, 1, 2, 1, 1, 1],
-        "meal_swapped": [0, 0, 1, 0, 0, 1, 1, 1, 0, 1],
-        "coupon_used": [1, 0, 1, 0, 1, 0, 0, 0, 0, 0],
-        "rating": [4.5, 4.0, 4.2, 4.8, 4.5, 3.0, 2.5, 2.0, 2.5, 2.0],
-    })
+    return pd.DataFrame(
+        {
+            "order_id": [f"ORD{i}" for i in range(10)],
+            "user_id": ["U001"] * 5 + ["U002"] * 5,
+            "order_date": pd.date_range("2025-04-01", periods=5).tolist() * 2,
+            "order_value": [100, 150, 120, 200, 180, 90, 80, 70, 60, 50],
+            "items_count": [2, 3, 2, 4, 3, 1, 2, 1, 1, 1],
+            "meal_swapped": [0, 0, 1, 0, 0, 1, 1, 1, 0, 1],
+            "coupon_used": [1, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+            "rating": [4.5, 4.0, 4.2, 4.8, 4.5, 3.0, 2.5, 2.0, 2.5, 2.0],
+        }
+    )
 
 
 @pytest.fixture
 def sample_engagement():
     """Create sample engagement data for testing."""
-    return pd.DataFrame({
-        "user_id": ["U001"] * 5 + ["U002"] * 5,
-        "date": pd.date_range("2025-06-01", periods=5).tolist() * 2,
-        "app_opens": [5, 4, 3, 4, 5, 1, 1, 0, 0, 0],
-        "recipes_viewed": [3, 2, 3, 2, 3, 0, 1, 0, 0, 0],
-        "support_tickets": [0, 0, 0, 0, 0, 1, 1, 2, 1, 1],
-        "notification_clicks": [2, 1, 2, 1, 2, 0, 0, 0, 0, 0],
-    })
+    return pd.DataFrame(
+        {
+            "user_id": ["U001"] * 5 + ["U002"] * 5,
+            "date": pd.date_range("2025-06-01", periods=5).tolist() * 2,
+            "app_opens": [5, 4, 3, 4, 5, 1, 1, 0, 0, 0],
+            "recipes_viewed": [3, 2, 3, 2, 3, 0, 1, 0, 0, 0],
+            "support_tickets": [0, 0, 0, 0, 0, 1, 1, 2, 1, 1],
+            "notification_clicks": [2, 1, 2, 1, 2, 0, 0, 0, 0, 0],
+        }
+    )
 
 
 class TestFeatureColumns:
@@ -85,12 +89,17 @@ class TestOrderFeatures:
     def test_computes_total_orders(self, sample_orders):
         user_ids = pd.Series(["U001", "U002"])
         features = compute_order_features(user_ids, sample_orders)
-        assert features[features["user_id"] == "U001"]["total_lifetime_orders"].values[0] == 5
+        assert (
+            features[features["user_id"] == "U001"]["total_lifetime_orders"].values[0]
+            == 5
+        )
 
     def test_computes_meal_swap_frequency(self, sample_orders):
         user_ids = pd.Series(["U001", "U002"])
         features = compute_order_features(user_ids, sample_orders)
-        u002_swap = features[features["user_id"] == "U002"]["meal_swap_frequency"].values[0]
+        u002_swap = features[features["user_id"] == "U002"][
+            "meal_swap_frequency"
+        ].values[0]
         assert u002_swap == 0.8  # 4 out of 5 orders
 
 
@@ -100,7 +109,9 @@ class TestEngagementFeatures:
     def test_computes_support_tickets(self, sample_engagement):
         user_ids = pd.Series(["U001", "U002"])
         features = compute_engagement_features(user_ids, sample_engagement)
-        u002_tickets = features[features["user_id"] == "U002"]["support_ticket_count"].values[0]
+        u002_tickets = features[features["user_id"] == "U002"][
+            "support_ticket_count"
+        ].values[0]
         assert u002_tickets == 6  # Sum of [1, 1, 2, 1, 1]
 
     def test_computes_engagement_score(self, sample_engagement):
@@ -108,8 +119,12 @@ class TestEngagementFeatures:
         features = compute_engagement_features(user_ids, sample_engagement)
         assert "engagement_score" in features.columns
         # U001 should have higher engagement than U002
-        u001_score = features[features["user_id"] == "U001"]["engagement_score"].values[0]
-        u002_score = features[features["user_id"] == "U002"]["engagement_score"].values[0]
+        u001_score = features[features["user_id"] == "U001"]["engagement_score"].values[
+            0
+        ]
+        u002_score = features[features["user_id"] == "U002"]["engagement_score"].values[
+            0
+        ]
         assert u001_score > u002_score
 
 

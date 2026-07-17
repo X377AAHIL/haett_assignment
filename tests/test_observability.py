@@ -1,16 +1,15 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
-from src.observability.metrics import get_metrics
-from src.observability.logger import request_id_var, correlation_id_var
 
 client = TestClient(app)
+
 
 def test_health_endpoint():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+
 
 def test_ready_endpoint():
     # It might return 200 or 503 depending on if model is actually loaded in test env.
@@ -22,6 +21,7 @@ def test_ready_endpoint():
     assert "status" in data
     assert "checks" in data
 
+
 def test_version_endpoint():
     response = client.get("/version")
     assert response.status_code == 200
@@ -31,12 +31,14 @@ def test_version_endpoint():
     assert "python_version" in data
     assert "git_commit" in data
 
+
 def test_metrics_endpoint():
     response = client.get("/metrics")
     assert response.status_code == 200
     data = response.json()
     assert "prediction_count" in data
     assert "average_latency" in data
+
 
 def test_system_info_endpoint():
     response = client.get("/system/info")
@@ -46,6 +48,7 @@ def test_system_info_endpoint():
     assert data["mlflow_tracking"] is True
     assert data["monitoring_enabled"] is True
 
+
 def test_middleware_injects_headers():
     # Make a request to health which is lightweight
     response = client.get("/health", headers={"X-Correlation-ID": "test-corr-id"})
@@ -53,6 +56,7 @@ def test_middleware_injects_headers():
     assert "X-Request-ID" in response.headers
     assert "X-Correlation-ID" in response.headers
     assert response.headers["X-Correlation-ID"] == "test-corr-id"
+
 
 def test_exception_handling():
     # Send a bad prediction request to trigger the global application error handler

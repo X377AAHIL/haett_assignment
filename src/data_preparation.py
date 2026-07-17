@@ -18,7 +18,6 @@ Assumptions:
 
 import os
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
 
 # Paths
@@ -34,13 +33,19 @@ def load_raw_data() -> dict:
     """Load all raw CSV files into DataFrames."""
     print("Loading raw data...")
     data = {
-        "users": pd.read_csv(os.path.join(RAW_DIR, "users.csv"), parse_dates=["signup_date"]),
-        "orders": pd.read_csv(os.path.join(RAW_DIR, "orders.csv"), parse_dates=["order_date"]),
+        "users": pd.read_csv(
+            os.path.join(RAW_DIR, "users.csv"), parse_dates=["signup_date"]
+        ),
+        "orders": pd.read_csv(
+            os.path.join(RAW_DIR, "orders.csv"), parse_dates=["order_date"]
+        ),
         "subscriptions": pd.read_csv(
             os.path.join(RAW_DIR, "subscriptions.csv"),
             parse_dates=["plan_start", "plan_end"],
         ),
-        "engagement": pd.read_csv(os.path.join(RAW_DIR, "engagement.csv"), parse_dates=["date"]),
+        "engagement": pd.read_csv(
+            os.path.join(RAW_DIR, "engagement.csv"), parse_dates=["date"]
+        ),
     }
 
     for name, df in data.items():
@@ -71,10 +76,17 @@ def clean_data(data: dict) -> dict:
     engagement = engagement.fillna(0)
 
     print("  Duplicates removed, invalid values cleaned")
-    return {"users": users, "orders": orders, "subscriptions": subs, "engagement": engagement}
+    return {
+        "users": users,
+        "orders": orders,
+        "subscriptions": subs,
+        "engagement": engagement,
+    }
 
 
-def create_churn_label(users: pd.DataFrame, orders: pd.DataFrame, subs: pd.DataFrame) -> pd.DataFrame:
+def create_churn_label(
+    users: pd.DataFrame, orders: pd.DataFrame, subs: pd.DataFrame
+) -> pd.DataFrame:
     """Create the binary churn label based on behavior in the churn window (June).
 
     A user is considered churned if:
@@ -89,15 +101,28 @@ def create_churn_label(users: pd.DataFrame, orders: pd.DataFrame, subs: pd.DataF
 
     # Count orders in the churn window (June)
     june_orders = (
-        orders[(orders["order_date"] >= PREDICTION_DATE) & (orders["order_date"] <= OBSERVATION_END)]
+        orders[
+            (orders["order_date"] >= PREDICTION_DATE)
+            & (orders["order_date"] <= OBSERVATION_END)
+        ]
         .groupby("user_id")
         .size()
         .reset_index(name="june_orders")
     )
 
     # Build labeled dataset
-    labeled = users[["user_id", "signup_date", "subscription_plan", "dietary_preference",
-                      "fitness_goal", "age", "city", "is_churned"]].copy()
+    labeled = users[
+        [
+            "user_id",
+            "signup_date",
+            "subscription_plan",
+            "dietary_preference",
+            "fitness_goal",
+            "age",
+            "city",
+            "is_churned",
+        ]
+    ].copy()
     labeled = labeled.merge(june_orders, on="user_id", how="left")
     labeled["june_orders"] = labeled["june_orders"].fillna(0).astype(int)
 
@@ -109,8 +134,12 @@ def create_churn_label(users: pd.DataFrame, orders: pd.DataFrame, subs: pd.DataF
     labeled["churned"] = labeled["is_churned"]
 
     churn_rate = labeled["churned"].mean()
-    print(f"  Churn rate: {churn_rate:.1%} ({labeled['churned'].sum():,} / {len(labeled):,})")
-    print(f"  Churned users with June orders: {labeled[(labeled['churned'] == 1) & (labeled['june_orders'] > 0)].shape[0]}")
+    print(
+        f"  Churn rate: {churn_rate:.1%} ({labeled['churned'].sum():,} / {len(labeled):,})"
+    )
+    print(
+        f"  Churned users with June orders: {labeled[(labeled['churned'] == 1) & (labeled['june_orders'] > 0)].shape[0]}"
+    )
     print(f"  Loyal users: {labeled[labeled['churned'] == 0].shape[0]:,}")
 
     return labeled
@@ -129,23 +158,29 @@ def prepare_dataset() -> tuple:
     data = clean_data(data)
 
     # Create labels
-    labeled_users = create_churn_label(data["users"], data["orders"], data["subscriptions"])
+    labeled_users = create_churn_label(
+        data["users"], data["orders"], data["subscriptions"]
+    )
 
     # Save intermediate
     os.makedirs(PROCESSED_DIR, exist_ok=True)
 
     # Separate feature-period data (before prediction date) for feature engineering
-    feature_orders = data["orders"][data["orders"]["order_date"] < PREDICTION_DATE].copy()
-    feature_engagement = data["engagement"][data["engagement"]["date"] < PREDICTION_DATE].copy()
+    feature_orders = data["orders"][
+        data["orders"]["order_date"] < PREDICTION_DATE
+    ].copy()
+    feature_engagement = data["engagement"][
+        data["engagement"]["date"] < PREDICTION_DATE
+    ].copy()
 
     print(f"\n  Feature-period orders: {len(feature_orders):,}")
     print(f"  Feature-period engagement: {len(feature_engagement):,}")
 
     merged = {
         "users": labeled_users,
-        "orders": feature_orders,           # ONLY pre-prediction orders for features
+        "orders": feature_orders,  # ONLY pre-prediction orders for features
         "subscriptions": data["subscriptions"],
-        "engagement": feature_engagement,   # ONLY pre-prediction engagement for features
+        "engagement": feature_engagement,  # ONLY pre-prediction engagement for features
     }
 
     # Save labeled users

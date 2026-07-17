@@ -39,11 +39,26 @@ RAW_DIR = os.path.join(BASE_DIR, "data", "raw")
 
 SUBSCRIPTION_PLANS = ["Basic", "Premium", "Family"]
 PLAN_PRICES = {"Basic": 499, "Premium": 899, "Family": 1299}
-DIETARY_PREFERENCES = ["Vegan", "Vegetarian", "Keto", "Paleo", "Balanced", "High-Protein"]
+DIETARY_PREFERENCES = [
+    "Vegan",
+    "Vegetarian",
+    "Keto",
+    "Paleo",
+    "Balanced",
+    "High-Protein",
+]
 FITNESS_GOALS = ["Weight Loss", "Muscle Gain", "Maintenance", "General Health"]
 CITIES = [
-    "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai",
-    "Pune", "Kolkata", "Ahmedabad", "Jaipur", "Lucknow",
+    "Mumbai",
+    "Delhi",
+    "Bangalore",
+    "Hyderabad",
+    "Chennai",
+    "Pune",
+    "Kolkata",
+    "Ahmedabad",
+    "Jaipur",
+    "Lucknow",
 ]
 
 
@@ -63,15 +78,17 @@ def generate_users(num_users: int) -> pd.DataFrame:
 
     plans = np.random.choice(SUBSCRIPTION_PLANS, size=num_users, p=[0.45, 0.35, 0.20])
 
-    users = pd.DataFrame({
-        "user_id": [f"U{str(i).zfill(5)}" for i in range(1, num_users + 1)],
-        "signup_date": signup_dates,
-        "subscription_plan": plans,
-        "dietary_preference": np.random.choice(DIETARY_PREFERENCES, size=num_users),
-        "fitness_goal": np.random.choice(FITNESS_GOALS, size=num_users),
-        "age": np.random.randint(22, 55, size=num_users),
-        "city": np.random.choice(CITIES, size=num_users),
-    })
+    users = pd.DataFrame(
+        {
+            "user_id": [f"U{str(i).zfill(5)}" for i in range(1, num_users + 1)],
+            "signup_date": signup_dates,
+            "subscription_plan": plans,
+            "dietary_preference": np.random.choice(DIETARY_PREFERENCES, size=num_users),
+            "fitness_goal": np.random.choice(FITNESS_GOALS, size=num_users),
+            "age": np.random.randint(22, 55, size=num_users),
+            "city": np.random.choice(CITIES, size=num_users),
+        }
+    )
 
     # Compute latent churn propensity from WEAK signals
     # Each factor contributes a little, but none is deterministic
@@ -115,7 +132,6 @@ def generate_orders(users: pd.DataFrame) -> pd.DataFrame:
         signup = user["signup_date"]
         is_churned = user["is_churned"]
         plan = user["subscription_plan"]
-        propensity = user["_churn_propensity"]
 
         # Base frequency varies by plan AND by individual (high variance)
         plan_base = {"Basic": 3.0, "Premium": 4.0, "Family": 5.0}[plan]
@@ -141,7 +157,9 @@ def generate_orders(users: pd.DataFrame) -> pd.DataFrame:
         if is_churned:
             base_rating = np.random.uniform(3.0, 4.5)  # Wide range, overlaps with loyal
         else:
-            base_rating = np.random.uniform(3.3, 4.8)  # Wide range, overlaps with churned
+            base_rating = np.random.uniform(
+                3.3, 4.8
+            )  # Wide range, overlaps with churned
 
         # Individual swap/coupon rates (large variance)
         base_swap_rate = np.random.uniform(0.05, 0.35)  # Same range for both
@@ -163,7 +181,9 @@ def generate_orders(users: pd.DataFrame) -> pd.DataFrame:
 
             # Weekly order count with decline
             freq_multiplier = max(0.3, 1 - week_progress * decline_strength)
-            weekly_orders = int(np.random.poisson(max(0.5, individual_freq * freq_multiplier)))
+            weekly_orders = int(
+                np.random.poisson(max(0.5, individual_freq * freq_multiplier))
+            )
 
             for _ in range(weekly_orders):
                 order_date = current_date + timedelta(
@@ -187,16 +207,18 @@ def generate_orders(users: pd.DataFrame) -> pd.DataFrame:
 
                 items_count = np.random.randint(1, 5)
 
-                all_orders.append({
-                    "order_id": f"ORD{str(order_id).zfill(7)}",
-                    "user_id": uid,
-                    "order_date": order_date,
-                    "order_value": round(value, 2),
-                    "items_count": items_count,
-                    "meal_swapped": meal_swapped,
-                    "coupon_used": coupon_used,
-                    "rating": rating,
-                })
+                all_orders.append(
+                    {
+                        "order_id": f"ORD{str(order_id).zfill(7)}",
+                        "user_id": uid,
+                        "order_date": order_date,
+                        "order_value": round(value, 2),
+                        "items_count": items_count,
+                        "meal_swapped": meal_swapped,
+                        "coupon_used": coupon_used,
+                        "rating": rating,
+                    }
+                )
                 order_id += 1
 
             current_date += timedelta(days=7)
@@ -208,16 +230,22 @@ def generate_orders(users: pd.DataFrame) -> pd.DataFrame:
                 num_june = np.random.randint(1, 4)
                 for _ in range(num_june):
                     od = PREDICTION_DATE + timedelta(days=np.random.randint(0, 10))
-                    all_orders.append({
-                        "order_id": f"ORD{str(order_id).zfill(7)}",
-                        "user_id": uid,
-                        "order_date": od,
-                        "order_value": round(base_value * np.random.uniform(0.5, 1.0), 2),
-                        "items_count": np.random.randint(1, 3),
-                        "meal_swapped": int(np.random.random() < base_swap_rate),
-                        "coupon_used": 0,
-                        "rating": round(np.clip(np.random.normal(3.0, 0.8), 1.0, 5.0), 1),
-                    })
+                    all_orders.append(
+                        {
+                            "order_id": f"ORD{str(order_id).zfill(7)}",
+                            "user_id": uid,
+                            "order_date": od,
+                            "order_value": round(
+                                base_value * np.random.uniform(0.5, 1.0), 2
+                            ),
+                            "items_count": np.random.randint(1, 3),
+                            "meal_swapped": int(np.random.random() < base_swap_rate),
+                            "coupon_used": 0,
+                            "rating": round(
+                                np.clip(np.random.normal(3.0, 0.8), 1.0, 5.0), 1
+                            ),
+                        }
+                    )
                     order_id += 1
         else:
             # Loyal users continue ordering in June
@@ -230,16 +258,27 @@ def generate_orders(users: pd.DataFrame) -> pd.DataFrame:
                     )
                     if od > OBSERVATION_END:
                         break
-                    all_orders.append({
-                        "order_id": f"ORD{str(order_id).zfill(7)}",
-                        "user_id": uid,
-                        "order_date": od,
-                        "order_value": round(base_value * np.random.uniform(0.8, 1.4), 2),
-                        "items_count": np.random.randint(1, 5),
-                        "meal_swapped": int(np.random.random() < base_swap_rate * 0.8),
-                        "coupon_used": int(np.random.random() < base_coupon_rate),
-                        "rating": round(np.clip(base_rating + np.random.normal(0, 0.5), 1.0, 5.0), 1),
-                    })
+                    all_orders.append(
+                        {
+                            "order_id": f"ORD{str(order_id).zfill(7)}",
+                            "user_id": uid,
+                            "order_date": od,
+                            "order_value": round(
+                                base_value * np.random.uniform(0.8, 1.4), 2
+                            ),
+                            "items_count": np.random.randint(1, 5),
+                            "meal_swapped": int(
+                                np.random.random() < base_swap_rate * 0.8
+                            ),
+                            "coupon_used": int(np.random.random() < base_coupon_rate),
+                            "rating": round(
+                                np.clip(
+                                    base_rating + np.random.normal(0, 0.5), 1.0, 5.0
+                                ),
+                                1,
+                            ),
+                        }
+                    )
                     order_id += 1
 
     orders = pd.DataFrame(all_orders)
@@ -280,14 +319,16 @@ def generate_subscriptions(users: pd.DataFrame) -> pd.DataFrame:
         # for BOTH groups. The only difference is is_renewed (post-hoc).
         is_renewed = 0 if is_churned else 1
 
-        subs.append({
-            "user_id": uid,
-            "plan_start": plan_start,
-            "plan_end": plan_end,
-            "is_renewed": is_renewed,
-            "plan_type": plan,
-            "monthly_price": PLAN_PRICES[plan],
-        })
+        subs.append(
+            {
+                "user_id": uid,
+                "plan_start": plan_start,
+                "plan_end": plan_end,
+                "is_renewed": is_renewed,
+                "plan_type": plan,
+                "monthly_price": PLAN_PRICES[plan],
+            }
+        )
 
     return pd.DataFrame(subs)
 
@@ -305,7 +346,6 @@ def generate_engagement(users: pd.DataFrame) -> pd.DataFrame:
         uid = user["user_id"]
         signup = user["signup_date"]
         is_churned = user["is_churned"]
-        propensity = user["_churn_propensity"]
 
         # Individual baseline engagement (large variance, overlapping ranges)
         if is_churned:
@@ -340,16 +380,20 @@ def generate_engagement(users: pd.DataFrame) -> pd.DataFrame:
             app_opens = max(0, int(np.random.poisson(max(0.3, base_app * decay))))
             recipes = max(0, int(np.random.poisson(max(0.2, base_recipe * decay))))
             notifs = max(0, int(np.random.poisson(max(0.1, base_notif * decay))))
-            tickets = int(np.random.poisson(base_support * (1 + progress * eng_decline * 2)))
+            tickets = int(
+                np.random.poisson(base_support * (1 + progress * eng_decline * 2))
+            )
 
-            records.append({
-                "user_id": uid,
-                "date": current_date,
-                "app_opens": app_opens,
-                "recipes_viewed": recipes,
-                "support_tickets": tickets,
-                "notification_clicks": notifs,
-            })
+            records.append(
+                {
+                    "user_id": uid,
+                    "date": current_date,
+                    "app_opens": app_opens,
+                    "recipes_viewed": recipes,
+                    "support_tickets": tickets,
+                    "notification_clicks": notifs,
+                }
+            )
 
             current_date += timedelta(days=3)
 
@@ -383,7 +427,9 @@ def main():
     print("\n" + "=" * 60)
     print("Data Generation Summary")
     print("=" * 60)
-    print(f"Users:         {len(users):,} ({users['is_churned'].mean():.1%} will churn)")
+    print(
+        f"Users:         {len(users):,} ({users['is_churned'].mean():.1%} will churn)"
+    )
     print(f"Orders:        {len(orders):,}")
     print(f"Subscriptions: {len(subscriptions):,}")
     print(f"Engagement:    {len(engagement):,}")

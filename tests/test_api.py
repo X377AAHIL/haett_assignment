@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 # We need to handle the case where the model isn't trained yet
 try:
     from api.main import app
+
     client = TestClient(app)
     API_AVAILABLE = True
 except Exception:
@@ -59,7 +60,9 @@ HIGH_RISK_REQUEST = {
 }
 
 
-@pytest.mark.skipif(not API_AVAILABLE, reason="API not available (model may not be trained)")
+@pytest.mark.skipif(
+    not API_AVAILABLE, reason="API not available (model may not be trained)"
+)
 class TestHealthEndpoint:
     """Tests for GET /health."""
 
@@ -76,7 +79,9 @@ class TestHealthEndpoint:
         assert data["status"] == "healthy"
 
 
-@pytest.mark.skipif(not API_AVAILABLE, reason="API not available (model may not be trained)")
+@pytest.mark.skipif(
+    not API_AVAILABLE, reason="API not available (model may not be trained)"
+)
 class TestPredictEndpoint:
     """Tests for POST /predict."""
 

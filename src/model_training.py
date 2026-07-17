@@ -20,6 +20,7 @@ import warnings
 
 import joblib
 import matplotlib
+
 matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.pyplot as plt
 import mlflow
@@ -32,10 +33,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
-    classification_report,
     confusion_matrix,
     f1_score,
-    precision_recall_curve,
     precision_score,
     recall_score,
     roc_auc_score,
@@ -70,7 +69,9 @@ def get_models() -> dict:
     """Return model configurations for training."""
     return {
         "LogisticRegression": {
-            "model": LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced"),
+            "model": LogisticRegression(
+                max_iter=1000, random_state=42, class_weight="balanced"
+            ),
             "params": {
                 "C": 1.0,
                 "max_iter": 1000,
@@ -79,7 +80,11 @@ def get_models() -> dict:
         },
         "RandomForest": {
             "model": RandomForestClassifier(
-                n_estimators=200, max_depth=10, random_state=42, class_weight="balanced", n_jobs=-1
+                n_estimators=200,
+                max_depth=10,
+                random_state=42,
+                class_weight="balanced",
+                n_jobs=-1,
             ),
             "params": {
                 "n_estimators": 200,
@@ -144,7 +149,11 @@ def plot_confusion_matrix(y_true, y_pred, model_name: str, save_path: str):
     cm = confusion_matrix(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(
-        cm, annot=True, fmt="d", cmap="Blues", ax=ax,
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        ax=ax,
         xticklabels=["Active", "Churned"],
         yticklabels=["Active", "Churned"],
     )
@@ -156,7 +165,9 @@ def plot_confusion_matrix(y_true, y_pred, model_name: str, save_path: str):
     plt.close()
 
 
-def plot_feature_importance(model, feature_names: list, model_name: str, save_path: str):
+def plot_feature_importance(
+    model, feature_names: list, model_name: str, save_path: str
+):
     """Plot and save feature importance."""
     if hasattr(model, "feature_importances_"):
         importances = model.feature_importances_
@@ -308,12 +319,14 @@ def train_pipeline():
         mlflow.log_artifact(cm_path)
 
         fi_path = os.path.join(MODELS_DIR, "feature_importance_XGBoost_Tuned.png")
-        plot_feature_importance(tuned_model, FEATURE_COLUMNS, "XGBoost (Tuned)", fi_path)
+        plot_feature_importance(
+            tuned_model, FEATURE_COLUMNS, "XGBoost (Tuned)", fi_path
+        )
         mlflow.log_artifact(fi_path)
 
         results["XGBoost_Tuned"] = {"model": tuned_model, "metrics": tuned_metrics}
 
-        print(f"\n  XGBoost (Tuned) Results:")
+        print("\n  XGBoost (Tuned) Results:")
         print(f"    Accuracy:  {tuned_metrics['accuracy']:.4f}")
         print(f"    Precision: {tuned_metrics['precision']:.4f}")
         print(f"    Recall:    {tuned_metrics['recall']:.4f}")
@@ -340,7 +353,11 @@ def train_pipeline():
         "model_name": best_name,
         "metrics": best_metrics,
         "feature_columns": FEATURE_COLUMNS,
-        "best_params": best_params if best_name == "XGBoost_Tuned" else results[best_name].get("params", {}),
+        "best_params": (
+            best_params
+            if best_name == "XGBoost_Tuned"
+            else results[best_name].get("params", {})
+        ),
     }
     metadata_path = os.path.join(MODELS_DIR, "model_metadata.json")
     with open(metadata_path, "w") as f:
@@ -352,12 +369,14 @@ def train_pipeline():
         mlflow.log_metrics(best_metrics)
         if "XGBoost" in best_name:
             mlflow.xgboost.log_model(
-                best_model, "model",
+                best_model,
+                "model",
                 registered_model_name="haett-churn-model",
             )
         else:
             mlflow.sklearn.log_model(
-                best_model, "model",
+                best_model,
+                "model",
                 registered_model_name="haett-churn-model",
             )
         mlflow.log_artifact(model_path)
@@ -367,31 +386,35 @@ def train_pipeline():
         print("\n🧠 Generating SHAP Explanations...")
         X_train_df = pd.DataFrame(X_train, columns=FEATURE_COLUMNS)
         X_test_df = pd.DataFrame(X_test, columns=FEATURE_COLUMNS)
-        
+
         # Initialize Explainer with dynamically selected best model
         explainer = ShapExplainer(model=best_model, background_data=X_train_df)
         shap_values = explainer.get_shap_values(X_test_df)
-        
+
         # Define paths
         shap_dir = os.path.join("artifacts", "shap")
         os.makedirs(shap_dir, exist_ok=True)
-        
+
         summary_path = os.path.join(shap_dir, "summary.png")
         bar_path = os.path.join(shap_dir, "bar.png")
         waterfall_path = os.path.join(shap_dir, "waterfall.png")
         json_path = os.path.join(shap_dir, "feature_importance.json")
-        
+
         # Save artifacts locally
         explainer.save_summary_plot(shap_values, summary_path)
         explainer.save_bar_plot(shap_values, bar_path)
-        
+
         # Find sample with highest predicted churn probability for waterfall plot
-        y_prob = best_model.predict_proba(X_test)[:, 1] if hasattr(best_model, "predict_proba") else best_model.predict(X_test)
+        y_prob = (
+            best_model.predict_proba(X_test)[:, 1]
+            if hasattr(best_model, "predict_proba")
+            else best_model.predict(X_test)
+        )
         highest_churn_idx = np.argmax(y_prob)
         explainer.save_waterfall_plot(shap_values, highest_churn_idx, waterfall_path)
-        
+
         explainer.save_feature_importance_json(shap_values, json_path)
-        
+
         # Log to MLflow under 'explainability' directory
         mlflow.log_artifact(summary_path, artifact_path="explainability")
         mlflow.log_artifact(bar_path, artifact_path="explainability")
@@ -403,9 +426,7 @@ def train_pipeline():
     print("\n" + "=" * 60)
     print("Model Comparison Summary")
     print("=" * 60)
-    summary = pd.DataFrame(
-        {name: res["metrics"] for name, res in results.items()}
-    ).T
+    summary = pd.DataFrame({name: res["metrics"] for name, res in results.items()}).T
     summary = summary.sort_values("f1_score", ascending=False)
     print(summary.to_string())
 
@@ -416,20 +437,29 @@ def train_pipeline():
     print("\n📦 Generating Monitoring Reference Dataset...")
     import datetime
     import yaml
-    
+
     # Use validation data before scaling (test_features)
     ref_df = test_features.copy()
-    y_prob = best_model.predict_proba(X_test)[:, 1] if hasattr(best_model, "predict_proba") else best_model.predict(X_test)
+    y_prob = (
+        best_model.predict_proba(X_test)[:, 1]
+        if hasattr(best_model, "predict_proba")
+        else best_model.predict(X_test)
+    )
     ref_df["prediction_probability"] = y_prob
-    ref_df["prediction"] = ["High" if p >= 0.6 else "Medium" if p >= 0.3 else "Low" for p in y_prob]
-    
+
+    from src.predict import classify_risk
+
+    ref_df["prediction"] = [classify_risk(p) for p in y_prob]
+
     model_version = datetime.datetime.now().strftime("v_%Y%m%d_%H%M%S")
-    ref_path = f"artifacts/monitoring/reference/reference_dataset_{model_version}.parquet"
+    ref_path = (
+        f"artifacts/monitoring/reference/reference_dataset_{model_version}.parquet"
+    )
     os.makedirs(os.path.dirname(ref_path), exist_ok=True)
-    
+
     ref_df.to_parquet(ref_path, engine="fastparquet")
     print(f"  Reference dataset saved to {ref_path}")
-    
+
     # Update config
     config_path = "config/monitoring.yaml"
     if os.path.exists(config_path):
@@ -442,7 +472,9 @@ def train_pipeline():
 
     print(f"\n✅ Training complete. Best model: {best_name}")
     print(f"   MLflow tracking URI: file://{MLFLOW_TRACKING_URI}")
-    print(f"   Run: mlflow ui --backend-store-uri file://{MLFLOW_TRACKING_URI} --port 5001")
+    print(
+        f"   Run: mlflow ui --backend-store-uri file://{MLFLOW_TRACKING_URI} --port 5001"
+    )
 
     return best_model, transformer, best_metrics
 

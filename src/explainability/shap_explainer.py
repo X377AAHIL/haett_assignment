@@ -6,12 +6,12 @@ Includes functionality to compute feature importances, plot visualizations,
 and extract top factors for API consumption.
 """
 
-import os
 import json
 from src.observability.logger import get_logger
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -39,7 +39,7 @@ FEATURE_DESCRIPTIONS = {
     "is_premium": "Whether the user is on a premium plan.",
     "engagement_score": "Overall app engagement activity.",
     "engagement_decline": "Drop in app engagement compared to historical average.",
-    "support_ticket_count": "Number of customer support tickets raised."
+    "support_ticket_count": "Number of customer support tickets raised.",
 }
 
 
@@ -48,7 +48,7 @@ class ShapExplainer:
 
     def __init__(self, model: Any, background_data: pd.DataFrame = None):
         """Initializes the appropriate SHAP explainer based on model type.
-        
+
         Args:
             model: The trained ML model.
             background_data: Optional background dataset (required for Linear/Kernel explainers).
@@ -57,19 +57,26 @@ class ShapExplainer:
         self.explainer = self._create_explainer(model, background_data)
         logger.info(f"Initialized {self.explainer.__class__.__name__} successfully.")
 
-    def _create_explainer(self, model: Any, background_data: pd.DataFrame) -> shap.Explainer:
+    def _create_explainer(
+        self, model: Any, background_data: pd.DataFrame
+    ) -> shap.Explainer:
         """Detects model type and creates the most efficient explainer."""
         model_name = type(model).__name__.lower()
-        
+
         try:
-            if any(tree_type in model_name for tree_type in ["xgb", "lgbm", "randomforest", "tree"]):
+            if any(
+                tree_type in model_name
+                for tree_type in ["xgb", "lgbm", "randomforest", "tree"]
+            ):
                 return shap.TreeExplainer(model)
             elif "logistic" in model_name or "linear" in model_name:
                 if background_data is None:
                     raise ValueError("Background data is required for Linear models.")
                 return shap.LinearExplainer(model, background_data)
             else:
-                logger.warning(f"Unsupported model {model_name}, falling back to KernelExplainer.")
+                logger.warning(
+                    f"Unsupported model {model_name}, falling back to KernelExplainer."
+                )
                 if background_data is None:
                     raise ValueError("Background data is required for Kernel models.")
                 # Use a small sample for KernelExplainer to avoid massive slowdowns
@@ -83,45 +90,51 @@ class ShapExplainer:
         """Computes SHAP values safely handling different explainer output shapes."""
         logger.info(f"Generating SHAP values for {len(X)} samples...")
         shap_values = self.explainer(X)
-        
+
         # Handle multi-class / probability output formats from TreeExplainer
         if len(shap_values.shape) > 2:
             # Usually index 1 is the positive class (Churn)
             return shap_values[:, :, 1]
         return shap_values
 
-    def explain_prediction(self, X: pd.DataFrame, top_k: int = 5) -> List[Dict[str, Any]]:
+    def explain_prediction(
+        self, X: pd.DataFrame, top_k: int = 5
+    ) -> List[Dict[str, Any]]:
         """Calculates SHAP values for a single prediction and returns top impacting factors.
-        
+
         Args:
             X: A single-row DataFrame.
             top_k: Number of top factors to return.
-            
+
         Returns:
             List of dictionaries with feature, impact, direction, and description.
         """
         try:
             shap_values = self.get_shap_values(X)
-            
+
             # For a single prediction
             sv = shap_values.values[0]
             feature_names = X.columns.tolist()
-            
+
             # Sort by absolute SHAP value
             top_indices = np.argsort(np.abs(sv))[::-1][:top_k]
-            
+
             top_factors = []
             for idx in top_indices:
                 impact = float(sv[idx])
                 direction = "increase_risk" if impact > 0 else "decrease_risk"
                 feature = feature_names[idx]
-                
-                top_factors.append({
-                    "feature": feature,
-                    "impact": round(impact, 4),
-                    "direction": direction,
-                    "description": FEATURE_DESCRIPTIONS.get(feature, f"Impact of {feature}.")
-                })
+
+                top_factors.append(
+                    {
+                        "feature": feature,
+                        "impact": round(impact, 4),
+                        "direction": direction,
+                        "description": FEATURE_DESCRIPTIONS.get(
+                            feature, f"Impact of {feature}."
+                        ),
+                    }
+                )
             return top_factors
         except Exception as e:
             logger.exception(f"Error computing explain_prediction: {e}")
@@ -134,7 +147,7 @@ class ShapExplainer:
         plt.figure(figsize=(10, 8))
         shap.summary_plot(shap_values, show=False)
         plt.tight_layout()
-        plt.savefig(path, dpi=300, bbox_inches='tight')
+        plt.savefig(path, dpi=300, bbox_inches="tight")
         plt.close()
 
     def save_bar_plot(self, shap_values: shap.Explanation, path: str):
@@ -143,16 +156,18 @@ class ShapExplainer:
         plt.figure(figsize=(10, 8))
         shap.plots.bar(shap_values, show=False)
         plt.tight_layout()
-        plt.savefig(path, dpi=300, bbox_inches='tight')
+        plt.savefig(path, dpi=300, bbox_inches="tight")
         plt.close()
 
-    def save_waterfall_plot(self, shap_values: shap.Explanation, sample_index: int, path: str):
+    def save_waterfall_plot(
+        self, shap_values: shap.Explanation, sample_index: int, path: str
+    ):
         """Generates and saves a waterfall plot for a specific sample index."""
         logger.info(f"Saving waterfall plot for sample {sample_index} to {path}...")
         plt.figure(figsize=(10, 8))
         shap.plots.waterfall(shap_values[sample_index], show=False)
         plt.tight_layout()
-        plt.savefig(path, dpi=300, bbox_inches='tight')
+        plt.savefig(path, dpi=300, bbox_inches="tight")
         plt.close()
 
     def save_feature_importance_json(self, shap_values: shap.Explanation, path: str):
@@ -160,16 +175,18 @@ class ShapExplainer:
         logger.info(f"Saving feature importance JSON to {path}...")
         mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
         feature_names = shap_values.feature_names
-        
+
         # Sort descending
         sorted_indices = np.argsort(mean_abs_shap)[::-1]
-        
+
         importance_list = []
         for idx in sorted_indices:
-            importance_list.append({
-                "feature": feature_names[idx],
-                "importance": float(round(mean_abs_shap[idx], 4))
-            })
-            
+            importance_list.append(
+                {
+                    "feature": feature_names[idx],
+                    "importance": float(round(mean_abs_shap[idx], 4)),
+                }
+            )
+
         with open(path, "w") as f:
             json.dump(importance_list, f, indent=2)

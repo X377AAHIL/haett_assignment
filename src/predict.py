@@ -7,7 +7,6 @@ Used by both the FastAPI endpoint and for batch predictions.
 
 import os
 import joblib
-import numpy as np
 import pandas as pd
 
 from src.feature_engineering import FEATURE_COLUMNS
@@ -47,15 +46,21 @@ class ChurnPredictor:
 
     def __init__(self, model_path: str = None, transformer_path: str = None):
         model_path = model_path or os.path.join(MODELS_DIR, "best_model.joblib")
-        transformer_path = transformer_path or os.path.join(MODELS_DIR, "feature_transformer.joblib")
+        transformer_path = transformer_path or os.path.join(
+            MODELS_DIR, "feature_transformer.joblib"
+        )
 
         if not os.path.exists(model_path):
             logger.error(f"Model not found at {model_path}")
-            raise ModelNotLoadedError(f"Model not found at {model_path}. Run model training first.")
-            
+            raise ModelNotLoadedError(
+                f"Model not found at {model_path}. Run model training first."
+            )
+
         if not os.path.exists(transformer_path):
             logger.error(f"Transformer not found at {transformer_path}")
-            raise ModelNotLoadedError(f"Transformer not found at {transformer_path}. Run model training first.")
+            raise ModelNotLoadedError(
+                f"Transformer not found at {transformer_path}. Run model training first."
+            )
 
         self.model = joblib.load(model_path)
         self.transformer = joblib.load(transformer_path)
@@ -100,7 +105,13 @@ class ChurnPredictor:
             if recommendation:
                 result["recommendation"] = recommendation
 
-            logger.info("Prediction successful", extra={"churn_probability": result["churn_probability"], "risk_level": risk_level})
+            logger.info(
+                "Prediction successful",
+                extra={
+                    "churn_probability": result["churn_probability"],
+                    "risk_level": risk_level,
+                },
+            )
             return result
         except Exception as e:
             logger.error(f"Prediction failed inside predictor: {e}", exc_info=True)

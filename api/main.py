@@ -12,7 +12,7 @@ Endpoints:
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.observability.logger import get_logger
@@ -23,7 +23,7 @@ from src.observability.exceptions import (
     ModelNotLoadedError,
     PredictionError,
     global_exception_handler,
-    application_error_handler
+    application_error_handler,
 )
 from src.observability.metrics import track_duration, record_prediction_latency
 
@@ -33,15 +33,15 @@ from api.schemas import (
     PredictionRequest,
     PredictionResponse,
     RecommendationResponse,
+    VersionResponse,
 )
 from src.predict import ChurnPredictor
 from src.explainability import ShapExplainer
 from src.monitoring.prediction_logger import PredictionLogger
-from src.monitoring.report_generator import ReportGenerator
-from src.monitoring.drift_monitor import DriftMonitor
 import pandas as pd
 import os
 import json
+import time
 
 # Logger setup
 logger = get_logger("api")
@@ -56,18 +56,21 @@ prediction_logger: Optional[PredictionLogger] = None
 async def lifespan(app: FastAPI):
     """Load the model on startup."""
     global predictor, explainer, prediction_logger
-    
-    logger.info("application_started", extra={
-        "event": "application_started",
-        "python": "3.11",
-        "mlflow_tracking": "enabled"
-    })
-    
+
+    logger.info(
+        "application_started",
+        extra={
+            "event": "application_started",
+            "python": "3.11",
+            "mlflow_tracking": "enabled",
+        },
+    )
+
     try:
         predictor = ChurnPredictor()
         prediction_logger = PredictionLogger()
         logger.info("✅ Model loaded successfully")
-        
+
         # Initialize explainer for the API (no background data for Tree models)
         try:
             explainer = ShapExplainer(model=predictor.model)
@@ -75,14 +78,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"⚠️ ShapExplainer initialization failed: {e}")
             explainer = None
-            
-    except FileNotFoundError as e:
-        logger.warning(f"⚠️ Model not found: {e}. Train the model first.")
+
+    except (FileNotFoundError, ModelNotLoadedError) as e:
+        logger.warning(f"Model not found: {e}. Train the model first.")
         predictor = None
         explainer = None
     finally:
         logger.info("application_shutdown", extra={"event": "application_shutdown"})
-        logger.info("🛑 Shutting down server")
+        logger.info("Shutting down server", extra={"event": "server_stopping"})
     yield
 
 
@@ -111,7 +114,6 @@ app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -120,14 +122,30 @@ app.add_middleware(
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health_check():
     """Check if the API is running and the model is loaded."""
+    from src.version import application_version
+
     return HealthResponse(
         status="healthy",
         model_loaded=predictor is not None,
-        version="1.0.0",
+        version=application_version,
+    )
+
+
+@app.get("/version", response_model=VersionResponse, tags=["System"])
+async def version_check():
+    """Get system version information."""
+    from src.version import application_version, model_version, build_date, git_commit
+
+    return VersionResponse(
+        application_version=application_version,
+        model_version=model_version,
+        build_date=build_date,
+        git_commit=git_commit,
     )
 
 
 app.include_router(health_router)
+
 
 @app.post(
     "/predict",
@@ -147,7 +165,6 @@ async def predict_churn(request: PredictionRequest):
     if predictor is None:
         raise ModelNotLoadedError()
 
-    import time
     start_predict = time.perf_counter()
     try:
         # Convert request to feature dictionary
@@ -167,7 +184,9 @@ async def predict_churn(request: PredictionRequest):
         top_factors = None
         if request.explain:
             if explainer is None:
-                logger.warning("Explanation requested but explainer is not initialized.")
+                logger.warning(
+                    "Explanation requested but explainer is not initialized."
+                )
             else:
                 try:
                     # Prepare and scale features identically to predict()
@@ -177,8 +196,10 @@ async def predict_churn(request: PredictionRequest):
                             df[col] = 0
                     df = df[predictor.feature_columns]
                     X_scaled = predictor.transformer.scaler.transform(df)
-                    X_scaled_df = pd.DataFrame(X_scaled, columns=predictor.feature_columns)
-                    
+                    X_scaled_df = pd.DataFrame(
+                        X_scaled, columns=predictor.feature_columns
+                    )
+
                     with track_duration("shap_explainability", logger):
                         top_factors = explainer.explain_prediction(X_scaled_df, top_k=5)
                 except Exception as e:
@@ -195,7 +216,7 @@ async def predict_churn(request: PredictionRequest):
             prediction_logger.log(
                 features=log_features,
                 prediction_probability=result["churn_probability"],
-                prediction_class=result["risk_level"]
+                prediction_class=result["risk_level"],
             )
 
         return PredictionResponse(
@@ -212,41 +233,41 @@ async def predict_churn(request: PredictionRequest):
         raise PredictionError(f"Prediction failed: {str(e)}")
 
 
-# Note: The old monitor endpoints are removed here since they might conflict or we can keep them.
-# The user asked to separate /health, but let's keep /monitor/drift since it was built previously.
-
-
 @app.get("/monitor/status", tags=["Monitoring"])
 async def monitor_status():
     """Return a summary of the current monitoring status."""
     try:
+        from src.monitoring.report_generator import ReportGenerator
+
         generator = ReportGenerator()
         ref_samples = 0
         prod_samples = 0
-        
+
         if os.path.exists(generator.reference_path):
             ref_samples = len(pd.read_parquet(generator.reference_path))
         if os.path.exists(generator.production_path):
             prod_samples = len(pd.read_parquet(generator.production_path))
-            
+
         history = []
         if os.path.exists("artifacts/monitoring/drift_history.json"):
             with open("artifacts/monitoring/drift_history.json", "r") as f:
                 history = json.load(f)
-                
+
         latest_run = history[-1] if history else None
-        
+
         return {
             "reference_samples": ref_samples,
             "production_samples": prod_samples,
             "last_monitoring_run": latest_run["timestamp"] if latest_run else None,
             "drift_detected": latest_run["drift_detected"] if latest_run else False,
-            "total_monitoring_runs": len(history)
+            "total_monitoring_runs": len(history),
         }
     except Exception as e:
         logger.error(f"Monitoring status error: {e}")
         from src.observability.exceptions import MonitoringError
+
         raise MonitoringError(str(e))
+
 
 @app.post("/monitor/drift", tags=["Monitoring"])
 async def trigger_drift_report():
@@ -254,20 +275,24 @@ async def trigger_drift_report():
     try:
         from src.monitoring.report_generator import ReportGenerator
         from src.monitoring.drift_monitor import DriftMonitor
+
         generator = ReportGenerator()
         monitor = DriftMonitor()
-        
+
         with track_duration("drift_report_generation", logger):
             result = generator.generate_reports()
         monitor.log_metrics(result)
-        
+
         return result
     except Exception as e:
         logger.error(f"Drift generation error: {e}")
         from src.observability.exceptions import MonitoringError
+
         raise MonitoringError(str(e))
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+
+    reload_mode = os.environ.get("RELOAD", "false").lower() == "true"
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=reload_mode)

@@ -92,6 +92,12 @@ class TestChurnPredictor:
         for result in results:
             assert "churn_probability" in result
 
+
+class TestModelLoadingErrors:
+    """Tests for failure paths when loading models."""
+
     def test_model_not_found_raises_error(self):
-        with pytest.raises(FileNotFoundError):
+        from src.observability.exceptions import ModelNotLoadedError
+
+        with pytest.raises(ModelNotLoadedError):
             ChurnPredictor(model_path="/nonexistent/path/model.joblib")

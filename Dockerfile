@@ -14,9 +14,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Generate data and train model during build (ensures model is baked into image)
-RUN python -m data.generate_synthetic_data && \
-    python -m src.model_training
+# Note: Models must be mounted externally or fetched (e.g. from MLflow).
+# For docker-compose, the ./models directory is already mounted.
+# If running standalone, ensure models/ is populated before running.
+# Example: docker run -v $(pwd)/models:/app/models haett-churn:v1.0.0
+
+# Add a non-root user
+RUN useradd -m -s /bin/bash appuser
+USER appuser
 
 # Expose port
 EXPOSE 8000

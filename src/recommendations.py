@@ -15,6 +15,7 @@ from typing import Optional
 @dataclass
 class Recommendation:
     """A business recommendation for a high-risk user."""
+
     action: str
     reason: str
 
@@ -33,7 +34,8 @@ RECOMMENDATION_RULES = [
     },
     {
         "name": "high_value_declining_engagement",
-        "condition": lambda f: f.get("avg_order_value", 0) > 100 and f.get("engagement_decline", 0) > 0.3,
+        "condition": lambda f: f.get("avg_order_value", 0) > 100
+        and f.get("engagement_decline", 0) > 0.3,
         "action": "Offer a 20% discount on the next subscription renewal",
         "reason": (
             "This user has high order value but declining engagement, suggesting dissatisfaction "

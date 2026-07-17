@@ -4,6 +4,7 @@ from src.observability.logger import get_logger
 
 logger = get_logger("monitoring.drift_monitor")
 
+
 class DriftMonitor:
     """Handles extracting and storing historical drift metrics."""
 
@@ -13,13 +14,13 @@ class DriftMonitor:
 
     def log_metrics(self, report_result: dict):
         """Append the latest drift metrics to the history file.
-        
+
         Args:
             report_result: Dictionary returned by ReportGenerator.generate_reports()
         """
         if report_result.get("status") == "skipped":
             return
-            
+
         history = []
         if os.path.exists(self.history_path):
             try:
@@ -30,14 +31,14 @@ class DriftMonitor:
 
         metric_entry = {
             "timestamp": report_result["timestamp"],
-            "drift_share": report_result["drift_share"],
+            "share_of_drifted_columns": report_result["share_of_drifted_columns"],
             "drift_detected": report_result["drift_detected"],
             "drifted_features": report_result["drifted_features"],
         }
-        
+
         history.append(metric_entry)
 
         with open(self.history_path, "w") as f:
             json.dump(history, f, indent=2)
-            
+
         logger.info(f"Appended drift metrics to history. Total runs: {len(history)}")

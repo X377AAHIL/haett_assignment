@@ -30,7 +30,7 @@ def record_prediction_latency(latency_ms: float):
     _metrics_state["prediction_count"] += 1
     count = _metrics_state["prediction_count"]
     current_avg = _metrics_state["average_latency"]
-    
+
     # Cumulative moving average
     new_avg = current_avg + (latency_ms - current_avg) / count
     _metrics_state["average_latency"] = new_avg
@@ -49,4 +49,7 @@ def track_duration(operation_name: str, logger=None):
     finally:
         duration_ms = (time.perf_counter() - start_time) * 1000
         if logger:
-            logger.debug(f"{operation_name} completed.", extra={"latency_ms": round(duration_ms, 2)})
+            logger.debug(
+                f"{operation_name} completed.",
+                extra={"latency_ms": round(duration_ms, 2)},
+            )

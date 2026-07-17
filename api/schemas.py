@@ -14,10 +14,9 @@ class PredictionRequest(BaseModel):
     Represents a user's historical activity features.
     All fields are required with sensible defaults and validation.
     """
-    
+
     explain: bool = Field(
-        False, 
-        description="Whether to include SHAP explanations in the response"
+        False, description="Whether to include SHAP explanations in the response"
     )
 
     days_since_last_order: float = Field(
@@ -169,20 +168,28 @@ class PredictionRequest(BaseModel):
 
 class RecommendationResponse(BaseModel):
     """Business recommendation for a user."""
+
     action: str = Field(..., description="Recommended retention action")
     reason: str = Field(..., description="Why this recommendation is appropriate")
 
 
 class TopFactor(BaseModel):
     """Explains a single feature's impact on the prediction."""
+
     feature: str = Field(..., description="The name of the feature")
     impact: float = Field(..., description="The magnitude of the SHAP impact")
-    direction: str = Field(..., description="Whether the impact increases or decreases risk (increase_risk, decrease_risk)")
-    description: str = Field(..., description="Human-readable description of the feature")
+    direction: str = Field(
+        ...,
+        description="Whether the impact increases or decreases risk (increase_risk, decrease_risk)",
+    )
+    description: str = Field(
+        ..., description="Human-readable description of the feature"
+    )
 
 
 class PredictionResponse(BaseModel):
     """Response from the /predict endpoint."""
+
     churn_probability: float = Field(
         ...,
         ge=0.0,
@@ -207,11 +214,22 @@ class PredictionResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response from the /health endpoint."""
+
     status: str = Field(..., description="API health status")
     model_loaded: bool = Field(..., description="Whether the ML model is loaded")
     version: str = Field(..., description="API version")
 
 
+class VersionResponse(BaseModel):
+    """Response from the /version endpoint."""
+
+    application_version: str = Field(..., description="API application version")
+    model_version: str = Field(..., description="ML model version")
+    build_date: str = Field(..., description="Build date")
+    git_commit: str = Field(..., description="Git commit hash")
+
+
 class ErrorResponse(BaseModel):
     """Error response format."""
+
     detail: str = Field(..., description="Error message")

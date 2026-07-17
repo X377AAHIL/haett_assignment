@@ -39,3 +39,4 @@ Thumbs.db
 # Extracted pages file
 _extracted/
 logs/
+artifacts/
